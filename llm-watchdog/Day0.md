@@ -70,39 +70,39 @@ Alerts are ingested, triaged **locally** by an **offline** model with signed, fi
 
 ---
 
-## telemetry vs audit (plain)
+## telemetry vs audit 
 **telemetry:** small, structured events so engineers can see what happened. chatty, rotates out  
 example:
-```json
+json
 {"event":"policy.decision","alert_id":"a1","mode":"simulate","confidence":0.92,"checks":{"allowlisted":true,"blast_radius_ok":true}}
 
-audit: append-only receipts for decisions/changes. who/what/when/why/target, tamper-evident
+**audit:** append-only receipts for decisions/changes. who/what/when/why/target, tamper-evident
 example:
 
 {"ts":"2025-10-27T21:40:00Z","actor":"system/policy_gate","action":"simulate_plan","obj":"alert:a1","details":{"rule":"auto-close-benign","confidence":0.92,"proposed_action":{"action":"close_alert","target":"alert:a1"},"rollback":{"action":"reopen_alert","target":"alert:a1"}}}
 
 
-rule of thumb: if it changes state or commits a decision, it’s audit. everything else useful to see is telemetry.
+# audit vs telemetry 
 
-glossary (short and sharp)
+**Rule of thumb:** if it **changes state** or **commits a decision**, it’s **audit**.  
+Everything else useful to see is **telemetry**.
 
-simulate: dry run. plan it, log it, change nothing
+## glossary (short and sharp)
 
-allowlist: the actions allowed to auto-run
+- **simulate:** dry run. plan it, log it, change nothing  
+- **allowlist:** the actions allowed to auto-run  
+- **blast radius:** max impact per action; capped at one target  
+- **idempotent:** safe to retry; doing it twice doesn’t stack damage  
+- **confidence:** model’s 0–1 “how sure”; you set the pass mark  
+- **rate limit:** caps per hour so nothing stampedes  
+- **signed policy:** `policy.yaml` approved and cryptographically stamped; unsigned = simulate all  
+- **rollback:** the exact undo step for any real action
 
-blast radius: max impact per action; capped at one target
+---
 
-idempotent: safe to retry; doing it twice doesn’t stack damage
+## starter `policy.yaml` (minimal, readable)
 
-confidence: model’s 0–1 “how sure”; you set the pass mark
-
-rate limit: caps per hour so nothing stampedes
-
-signed policy: policy.yaml approved and cryptographically stamped; unsigned = simulate all
-
-rollback: the exact undo step for any real action
-
-starter policy.yaml (minimal, readable)
+```yaml
 version: 1
 default_mode: simulate
 confidence_threshold: 0.85
@@ -136,28 +136,6 @@ signature:
   algo: pgp
   signed_by: POLICY_MAINTAINER
   sig: "PENDING"
-
-events to log (phase 0/1)
-
-ingest.accept {source, bytes, ts}
-
-ingest.reject {source, reason, ts}
-
-worker.model_call {model, prompt_hash, latency_ms}
-
-worker.parse_error {alert_id, prompt_hash, reason}
-
-policy.decision {alert_id, mode, confidence, checks:{...}}
-
-audit.snapshot.created {items, hash}
-
-acceptance check (phase 0/1)
-
-default mode is simulate; any uncertainty falls back to simulate
-
-model host has no outbound network
-
-every decision writes an audit row (who/what/when/why/target)
 
 policy must verify signature or it’s ignored
 
