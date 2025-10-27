@@ -100,43 +100,20 @@ Everything else useful to see is **telemetry**.
 
 ---
 
-## starter `policy.yaml` (minimal, readable)
+# sources — phase 0 (definition only)
 
-```yaml
-version: 1
-default_mode: simulate
-confidence_threshold: 0.85
+We are defining sources, not implementing pipelines. Exactly **two** sources. No third “for fun.”
 
-allowlist_actions:
-  - close_as_known_good
-  - add_tag_low_risk
-  - comment_with_summary
+## source A: zeek dns
+- **Purpose:** basic network signal to distinguish routine DNS (time sync, update servers) from noisy junk.
+- **Why chosen:** easy to generate locally or mock; low risk; good for “close-as-known-good.”
+- **Scope note:** payloads small; used only for triage demos in simulate mode.
 
-blast_radius:
-  max_targets_per_action: 1
+## source B: entra id sign-ins
+- **Purpose:** authentication signal (failed→success patterns, unusual IP/geo) to test triage summaries.
+- **Why chosen:** common enterprise noise pattern; simple fields; easy to mock for demos.
+- **Scope note:** dev/sandbox or mocked data only in Phase 0; simulate mode only.
 
-rate_limits:
-  global_per_hour: 10
-  per_entity_per_hour: 3
-
-rules:
-  - name: safe-auto-close
-    when:
-      action: close_as_known_good
-      tags_contains: [auto_close_ok]
-      confidence_ge: 0.85
-    mode: simulate   # flip to execute later when you're confident
-
-  - name: account-changes-need-human
-    when:
-      action: disable_user
-    mode: approve
-
-signature:
-  algo: pgp
-  signed_by: POLICY_MAINTAINER
-  sig: "PENDING"
-
-policy must verify signature or it’s ignored
-
-actions are idempotent and single-target, even in simulate
+## fence (reminder)
+- Only **Zeek DNS** and **Entra ID sign-ins** in Phase 0.
+- No new sources until Phase 0 acceptance is done.
