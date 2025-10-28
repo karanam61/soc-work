@@ -117,3 +117,94 @@ We are defining sources, not implementing pipelines. Exactly **two** sources. No
 ## fence (reminder)
 - Only **Zeek DNS** and **Entra ID sign-ins** in Phase 0.
 - No new sources until Phase 0 acceptance is done.
+- 
+
+# success metrics — phase 0/1
+
+Numbers, not vibes. Three metrics: one proves receipts (audit), one proves speed (performance), one proves restraint (safety).
+
+---
+
+## 1) integrity — audit coverage
+
+**Goal:** every accepted alert gets at least one **audit row** (a formal receipt).
+
+**Audit row = one decision receipt** with:
+- **who** → `actor` (e.g., `system/policy_gate`, `user:anish`)
+- **what** → `action` (`simulate_plan` | `approve_request` | `execute` | `rollback`)
+- **when** → `ts`
+- **target** → `obj` (e.g., `alert:a1`)
+- **why** → `details` (rule, confidence, checks, reason, proposed/rollback)
+- **row_hash** → SHA-256 over the row contents (tamper-evident)
+
+**Metric (with SLA):**
+- **Audit coverage % =**  
+  `(# unique alerts with ≥ 1 audit row within SLA) / (# alerts accepted) * 100`
+- **SLA window:** 60 seconds from `ingest.accept` to first audit row.
+
+**Target:** **≥ 95%** over any rolling 24h window.
+
+**Counts that satisfy “has an audit row”:**
+- First audit `action` is any of: `simulate_plan`, `approve_request`, `execute` (rare in P0/1).  
+  `rollback` rows exist, but the first row should normally be one of the three above.
+
+**Pass/Fail example:**
+- Accepted alerts today: **A = 120**  
+- Alerts with a first audit row ≤ 60s: **B = 116**  
+- Coverage = `116/120 * 100 = 96.7%` → **PASS**  
+- Misses (4) are defects to fix: parse errors beyond SLA, policy verify not downgrading to simulate, audit write failure, etc.
+
+**Why this metric matters:**  
+An accepted alert without a decision receipt (audit row) is a pipeline hole, not “still thinking.”
+
+---
+
+## 2) performance — triage latency (p95)
+
+**Goal:** be faster than a human skim for small alerts.
+
+**Definition:** time from worker picking an alert to valid model JSON returned.
+
+**Scope:** only alerts with payload size **≤ 4 KB**.
+
+**Metric:**
+- **p95 triage latency ≤ 2.0 s**
+
+**How to compute p95 (simple):**
+1. Collect `latency_ms` for eligible alerts in the window.
+2. Sort the list.
+3. Take the value at the 95th percentile index (round up).
+
+**Example:**
+- Latencies (ms): `[600, 700, 820, 900, 1100, 1300, 1700, 1900, 2100, 2400]`  
+- 10 samples → 95th percentile = value at index 10 → **2400 ms (2.4 s)** → **FAIL**  
+- If max were 1800 ms → **1.8 s** → **PASS**
+
+**Fail threshold:** p95 > 2.0 s for **2 consecutive days**.
+
+---
+
+## 3) safety — unsigned policies
+
+**Goal:** never act on rules we can’t trust.
+
+**Metric:**  
+- **Unsigned policy loads (last 24h) = 0**
+
+**How to count:**
+- Count telemetry events `policy.verify_fail` (policy signature invalid/missing).
+- System behavior must also force **simulate** on verify failure, but the metric still fails if any occur.
+
+**Target:** **0** every day.
+
+---
+
+## minimal telemetry required to compute these
+
+Emit these fields at minimum:
+
+- `ingest.accept {alert_id, ts, size_bytes}`  
+- `policy.decision {alert_id, mode, ts, details:{…}}`  
+  (this is the trigger to write an **audit row**; the audit record includes `actor, action, obj, details, row_hash`)
+- `worker.model_call {alert_id, latency_ms, payload_bytes, ts}`  
+- `policy.verify_fail {reason, ts}`
