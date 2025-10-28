@@ -199,12 +199,44 @@ An accepted alert without a decision receipt (audit row) is a pipeline hole, not
 
 ---
 
-## minimal telemetry required to compute these
 
-Emit these fields at minimum:
+## trust zones
 
-- `ingest.accept {alert_id, ts, size_bytes}`  
-- `policy.decision {alert_id, mode, ts, details:{…}}`  
-  (this is the trigger to write an **audit row**; the audit record includes `actor, action, obj, details, row_hash`)
-- `worker.model_call {alert_id, latency_ms, payload_bytes, ts}`  
-- `policy.verify_fail {reason, ts}`
+| Zone     | What it is               | Inbound from            | Outbound to      | Guardrails                 | If broken…               |
+|----------|---------------------------|-------------------------|------------------|----------------------------|--------------------------|
+| Sources  | Zeek DNS, Entra sign-ins  | n/a                     | Worker (HTTP)    | small messages (≤ 4 KB)    | Noisy/fake alerts enter  |
+| Worker   | your small local app      | Sources (HTTP)          | Database (writes)| **no internet**, simulate  | Bad/slow summaries       |
+| Database | Supabase tables           | Worker (writes/reads)   | UI (read-only)   | least-privilege roles      | Data integrity risk      |
+| UI       | Lovable (read-only)       | Database (read-only)    | n/a              | read-only access           | Misleading views only    |
+
+**Flow:** Sources → Worker → Database → UI  
+**Model:** Worker ↔ Local model (no internet)
+
+---
+
+## identities & permissions (minimum)
+
+| Name       | DB permissions                                      | Purpose                                | Rotate |
+|------------|------------------------------------------------------|----------------------------------------|-------:|
+| `app_svc`  | **INSERT:** `alerts`, `triage`<br>**SELECT:** `alerts` | Worker writes and re-reads alerts for processing/retry | 90d    |
+| `ui_reader`| **SELECT (RO):** `alerts`, `triage`                   | UI display only                        | 90d    |
+
+Rules: no `UPDATE`, no `DELETE`, no DDL. If you think you need them, you don’t.
+
+
+
+## telemetry (minimal so metrics work)
+
+ingest.accept{alert_id, source, ts, size_bytes}
+
+ingest.reject{source, reason, ts}
+
+app.model_call{alert_id, model, latency_ms, payload_bytes, ts}  app = worker 
+
+app.parse_error{alert_id, reason, ts}
+
+app.triage_write{alert_id, triage_id, ts}
+
+---
+
+
