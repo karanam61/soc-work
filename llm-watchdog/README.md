@@ -1,12 +1,23 @@
-# LLM Watchdog - Autonomous SOC AI System
+# Security Log Analysis Worker
 
-Security decision system that automates triage and safe low-risk actions with strict policy gates and full auditability.
+Rule-based security log worker that processes Zeek logs, maps them to MITRE ATT&CK techniques, and routes alerts by priority.
 
-## Layers
-- Data: Supabase tables (alerts, triage, actions, labels)
-- Model: Local Ollama (Qwen2.5/Llama3.1) strict JSON
-- RAG: Chroma with MITRE, Sigma, Playbooks, Policies, OSINT
-- Policy: Verifier + YAML allowlists/thresholds/blast radius
-- SOAR: Simulated tools with rollback
+## Status
+**Phase:** Design  
+**Timeline:** 8 weeks (12 hrs/week)
 
-Directories: worker/, prompts/, supabase/, chroma/, docs/
+## Architecture
+
+![Worker Architecture](worker-architecture.png)
+
+## Design Doc
+See [DESIGN.md](DESIGN.md) for full design thinking and decisions.
+
+## Tech Stack (Planned)
+- Python (log parsing, queue logic)
+- Supabase (MITRE severity database)
+- Sigma rules (log-to-MITRE mapping)
+- HTTP endpoint (log ingestion)
+- Loveable (frontend)
+
+
