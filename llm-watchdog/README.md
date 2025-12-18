@@ -8,7 +8,7 @@ Rule-based security log worker that processes Zeek logs, maps them to MITRE ATT&
 
 ## Architecture
 
-![Worker Architecture](worker-architecture.png)
+![Worker Architecture](architecture.png)
 
 ## Design Doc
 See [DESIGN.md](DESIGN.md) for full design thinking and decisions.
